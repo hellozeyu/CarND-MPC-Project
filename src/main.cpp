@@ -91,6 +91,7 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double throttle_value = j[1]["throttle"];
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,20 +99,70 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+            double steering_angle= j[1]["steering_angle"];
+//          cout<<"px:"<<px<<"\t py:"<<py<<"\t psi:"<<psi<<"\t v:"<<v<<"\t steering_angle:"<<steering_angle<<endl;
+
+            //To overcome control delay, predict the car state after 100ms using the kinetic modle.
+            px += v*cos(psi)*0.1;
+            py += v*sin(psi)*0.1;
+            psi -= v/ 2.67 * steering_angle * 0.1; //note in the simulator the sign of the steering angle is different from the standard one.
+
+            // Adding latency for velocity
+            v = v + throttle_value * 0.1;
+            
+            //calculate the waypoints' coordinates relative to the predicted car state.
+            Eigen::VectorXd rel_x_vals(ptsx.size()), rel_y_vals(ptsx.size());
+            for(int i=0; i<ptsx.size();++i)
+            {
+                double dx = ptsx[i]-px;
+                double dy = ptsy[i]-py;
+                rel_x_vals[i] = dx*cos(psi) + dy*sin(psi);
+                rel_y_vals[i] = -dx*sin(psi) + dy*cos(psi);
+
+            }
+
+            auto coeffs = polyfit(rel_x_vals, rel_y_vals, 3);
+
+            // The cross track error is calculated by evaluating at polynomial at x (which is 0), f(0)
+            // and subtracting y.
+            double cte = polyeval(coeffs, 0) - 0;
+            // Due to the sign starting at 0, the orientation error is f'(x) at x=0.
+            // derivative of the fitted polynomial is: f'(x)= coeffs[1]+ 2*coeffs[2]*x + 3*coeffs[1]*x*x.
+            // f'(0) = coeffs[1].
+            double epsi = atan(coeffs[1]) - 0;
+
+            /*
+            * Calculate steeering angle and acceleration using MPC.
+            */
+            Eigen::VectorXd state(6);
+            state << 0, 0, 0, v, cte, epsi;
+            vector<double> controls = mpc.Solve(state, coeffs);
+
+
+          double steer_value = controls[0];;
+          throttle_value = controls[1];;
+//          double throttle_value = controls[1];;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = -steer_value/deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
+            //add (x,y) points to list here, points are in reference to the vehicle's coordinate system
+            // the points in the simulator are connected by a Green line
+            for(int i=0; i<(controls.size()-2)/2; ++i)
+            {
+                mpc_x_vals.push_back( controls[2+2*i] );
+                mpc_y_vals.push_back( controls[2+2*i+1] );
+            }
+
+
+            //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
           msgJson["mpc_x"] = mpc_x_vals;
@@ -123,6 +174,14 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+
+
+            for(int i=0; i<ptsx.size(); ++i)
+            {
+                next_x_vals.push_back( rel_x_vals[i] );
+                next_y_vals.push_back( rel_y_vals[i] );
+
+            }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;

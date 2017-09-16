@@ -1,6 +1,45 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
 
+
+## The Model
+The vehicle state has the following components:
+
+- px: x coordinate
+- py: y coordinate
+- psi: yaw angle or orientation of the vehicle
+- v: speed of the vehicle
+
+The actuators of the vehicle are:
+
+- delta: steering angle
+- a: acceleration
+
+The update equations are used to compute the state of the car at the next time step, based on the state at the current time step:
+
+```$xslt
+px' = px + v * cos(psi) * dt;
+py' = px + v * sin(psi) * dt;
+psi' = psi + v / Lf* delta * dt;
+v' = v + a * dt;
+cte = coeffs[0]+coeffs[1] * px + coeffs[2] * px^2 + coeffs[3] * px^3 - py;
+epsi = atan(coeffs[1] + 2*coeffs[2] * px + 3*coeffs[3]* px^3 - psi.
+```
+
+## Timestep Length and Frequency
+I started out with N=20 steps and time step length of dt=50ms which already provided good results. I noticed that this combination of parameters would lead to unstable results in sharp turns at higher speeds. The solver would find a solution with a much too aggressive steering angle for some time steps. 
+
+I then tried reducing the number of steps and simultaneously increasing the length of the time steps. I want to predict a total of about 2 seconds ahead, and to emulate the continuous vehicle motion with discrete steps, the resolution (i.e. dt) should be small. Reducing the number of steps also has the advantage of greatly improving the performance of the system, as the numerical fitting of a solution is computationally expensive. I settled on a combination of N = 10 and dt = 100 ms which gives good results at moderate speeds. 
+
+
+## Polynomial Fitting and MPC Preprocessing
+The resulting x-direction is the forward direction of the vehicle, while the y-direction represents the lateral displacement of waypoints relative to the center of the vehicle. I transformed the coordinates of the currently received waypoints and fitted a 3rd polynomial of the form `y = a*x^3 + b*x^2 + c*x + d`
+
+
+## Model Predictive Control with Latency
+
+The idea to overcome control latency is to predict the state of the car after a delay. In the starter code of main.cpp, it predicts the state after 100 millisecond, and treat that state as the initial state for the MPC. However, it doesn't take into account the latency in velocity. So I extracted the throttle value of the data and added a delay of speed `v = v + throttle_value * 0.1;`
+
 ---
 
 ## Dependencies
