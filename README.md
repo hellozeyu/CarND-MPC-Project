@@ -38,7 +38,7 @@ The resulting x-direction is the forward direction of the vehicle, while the y-d
 
 ## Model Predictive Control with Latency
 
-The idea to overcome control latency is to predict the state of the car after a delay. In the starter code of main.cpp, it predicts the state after 100 millisecond, and treat that state as the initial state for the MPC. However, it doesn't take into account the latency in velocity. So I extracted the throttle value of the data and added a delay of speed `v = v + throttle_value * 0.1;`
+The idea to overcome control latency is to predict the state of the car after a delay. In the starter code of main.cpp, it predicts the state after 100 millisecond, and treat that state as the initial state for the MPC. However, it doesn't take into account the latency in velocity. So I extracted the throttle value of the car and added a delay of speed `v = v + throttle_value * 0.1;`
 
 ---
 
